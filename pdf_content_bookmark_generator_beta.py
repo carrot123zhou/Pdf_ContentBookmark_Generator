@@ -595,7 +595,38 @@ class RequestHandler(BaseHTTPRequestHandler):
             <button onclick="updateTocPages()" class="btn-warning">更新目录页范围</button>
             <button onclick="extractTocPages()">提取目录页</button>
             <button onclick="openQwen()" class="btn-info">使用通义千问识别目录</button>
-            <div>推荐提示词："请读取目录信息，保留层级结构和页码，可以在适当的情况下补充缺失的页码信息"</div>
+            <div>
+                <div style="display: flex; align-items: center;">
+                    <div style="flex-grow: 1;">
+                        <div style="font-weight: bold;">推荐提示词：</div>
+                        <div id="promptContainer" style="max-height: 100px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
+请分析这个PDF文档的目录页，并按照以下要求输出目录结构：<br><br>
+
+1. 保留完整的层级结构信息，使用缩进或编号方式表示层级关系<br>
+2. 每行输出一个目录项，格式为："标题内容 ...................... 页码"（页码前的点线为可选）<br>
+3. 对于缺失页码的条目，请根据上下文逻辑推断并补充完整页码<br>
+4. 支持多种标题格式：<br>
+&nbsp;&nbsp;&nbsp;- 章节编号格式：如"第1章 绪论"、"1.1 背景介绍"<br>
+&nbsp;&nbsp;&nbsp;- Markdown格式：使用#符号表示层级<br>
+&nbsp;&nbsp;&nbsp;- 缩进格式：通过空格或制表符表示层级<br>
+&nbsp;&nbsp;&nbsp;- 中文序数格式：如"一、"、"1."、"（一）"等<br>
+5. 保持原始层级结构，不要改变标题内容<br>
+6. 输出时不要包含任何解释性文字，只输出目录内容本身<br><br>
+
+示例输出格式：<br>
+# 第一章 绪论 1<br>
+## 1.1 研究背景 1<br>
+## 1.2 研究意义 3<br>
+# 第二章 文献综述 5<br>
+## 2.1 国内研究现状 5<br>
+## 2.2 国外研究现状 8<br>
+                        </div>
+                    </div>
+                    <div style="margin-left: 10px;">
+                        <button onclick="copyPrompt()" class="btn-secondary">复制提示词</button>
+                    </div>
+                </div>
+            </div>
             <div id="tocImageContainer"></div>
         </div>
         
@@ -647,7 +678,6 @@ class RequestHandler(BaseHTTPRequestHandler):
                 <button class="btn-danger" onclick="deleteSelectedBookmarks()">删除选中书签</button>
                 <button class="btn-warning" onclick="moveSelectedUp()">上移</button>
                 <button class="btn-warning" onclick="moveSelectedDown()">下移</button>
-                <button class="btn-info" onclick="undoOperation()">撤销操作</button>
                 <button onclick="invertSelection()">反选</button>
             </div>
             <div class="bookmarks-container">
@@ -785,7 +815,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     <td>${originalPage || ''}</td>
                     <td><input type="number" class="page-input" id="page_${index}" value="${bookmark.page || ''}"></td>
                     <td>
-                        <button class="btn-danger" onclick="removeBookmark(${index})">删除</button>
+                        <button class="btn-danger" onclick="removeBookmark(this)">删除</button>
                     </td>
                 `;
                 
@@ -954,7 +984,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 <td></td>
                 <td><input type="number" class="page-input" id="page_${rowCount}" value=""></td>
                 <td>
-                    <button class="btn-danger" onclick="removeBookmark(${rowCount})">删除</button>
+                    <button class="btn-danger" onclick="removeBookmark(this)">删除</button>
                 </td>
             `;
             
@@ -1003,7 +1033,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 <td></td>
                 <td><input type="number" class="page-input" id="page_${selectedIndex}" value=""></td>
                 <td>
-                    <button class="btn-danger" onclick="removeBookmark(${selectedIndex})">删除</button>
+                    <button class="btn-danger" onclick="removeBookmark(this)">删除</button>
                 </td>
             `;
             
@@ -1020,8 +1050,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         }
         
         // 删除书签
-        function removeBookmark(index) {
-            const row = document.querySelector(`#bookmarksTable tbody tr:nth-child(${index+1})`);
+        function removeBookmark(button) {
+            const row = button.closest('tr');
             if (row) {
                 row.remove();
                 updateBookmarkIndices();
@@ -1189,24 +1219,24 @@ class RequestHandler(BaseHTTPRequestHandler):
         }
         
         // 撤销操作
-        function undoOperation() {
-            fetch('/undo', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    renderBookmarks(data.bookmarks, data.original_bookmarks);
-                    document.getElementById('currentOffset').textContent = data.offset;
-                    showNotification('已撤销操作', 'success');
-                } else {
-                    showNotification('无法撤销: ' + data.message, 'error');
-                }
-            })
-            .catch(error => {
-                showNotification('撤销出错: ' + error, 'error');
-            });
-        }
+        // function undoOperation() {
+        //     fetch('/undo', {
+        //         method: 'POST'
+        //     })
+        //     .then(response => response.json())
+        //     .then(data => {
+        //         if (data.status === 'success') {
+        //             renderBookmarks(data.bookmarks, data.original_bookmarks);
+        //             document.getElementById('currentOffset').textContent = data.offset;
+        //             showNotification('已撤销操作', 'success');
+        //         } else {
+        //             showNotification('无法撤销: ' + data.message, 'error');
+        //         }
+        //     })
+        //     .catch(error => {
+        //         showNotification('撤销出错: ' + error, 'error');
+        //     });
+        // }
         
         // 计算并应用偏移量
         function calculateAndApplyOffset() {
@@ -1465,6 +1495,36 @@ class RequestHandler(BaseHTTPRequestHandler):
             });
         });
         
+        // 复制提示词到剪贴板
+        function copyPrompt() {
+            const promptText = `请分析这个PDF文档的目录页，并按照以下要求输出目录结构：
+
+1. 保留完整的层级结构信息，使用缩进或编号方式表示层级关系
+2. 每行输出一个目录项，格式为："标题内容 ...................... 页码"（页码前的点线为可选）
+3. 对于缺失页码的条目，请根据上下文逻辑推断并补充完整页码
+4. 支持多种标题格式：
+   - 章节编号格式：如"第1章 绪论"、"1.1 背景介绍"
+   - Markdown格式：使用#符号表示层级
+   - 缩进格式：通过空格或制表符表示层级
+   - 中文序数格式：如"一、"、"1."、"（一）"等
+5. 保持原始层级结构，不要改变标题内容
+6. 输出时不要包含任何解释性文字，只输出目录内容本身
+
+示例输出格式：
+# 第一章 绪论 1
+## 1.1 研究背景 1
+## 1.2 研究意义 3
+# 第二章 文献综述 5
+## 2.1 国内研究现状 5
+## 2.2 国外研究现状 8`;
+            
+            navigator.clipboard.writeText(promptText).then(() => {
+                showNotification('提示词已复制到剪贴板', 'success');
+            }).catch(err => {
+                showNotification('复制失败: ' + err, 'error');
+            });
+        }
+        
         // 页面加载完成后检查是否有已上传的文件
         window.addEventListener('load', function() {
             fetch('/check_file')
@@ -1683,25 +1743,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         
         elif self.path == '/undo':
             # 撤销操作
-            success = self.generator.undo()
+            # success = self.generator.undo()
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             
-            if success:
-                response = {
-                    'status': 'success',
-                    'bookmarks': self.generator.bookmarks,
-                    'original_bookmarks': self.generator.original_bookmarks,
-                    'offset': self.generator.offset,
-                    'message': '操作已撤销'
-                }
-            else:
-                response = {
-                    'status': 'error',
-                    'message': '无法撤销操作'
-                }
+            response = {
+                'status': 'error',
+                'message': '撤销功能已移除'
+            }
             self.wfile.write(json.dumps(response).encode('utf-8'))
         
         elif self.path == '/extract_toc':
